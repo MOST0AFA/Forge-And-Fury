@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "forgeandfury",
+	"version": "1.0.0",
+	"name": "Forge & Fury",
+	"description": "A mod that adds powerful enchanted weapons",
+	"authors": ["MOST0AFA"],
+	"contact": {
+		"sources": "https://github.com/MOST0AFA/ForgeAndFury"	
+	},
+	"license": "MIT",
+	"icon": "assets/forgeandfury/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"dev.most0afa.forge.and.fury.ForgeAndFuryMain"
+		],
+		"client": [
+			"dev.most0afa.forge.and.fury.ForgeAndFuryClient"
+		]
+	},
+	"mixins": [
+		"mixins.json"
+
+	],
+	"depends": {
+		"fabricloader": ">=0.14.21",
+		"minecraft": "1.21",
+		"fabric-api": "*"
+	}
+}

@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "com.forge.and.fury.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [],
+	"client": [
+      "dev.most0afa.forge.and.fury.mixin.client.ExampleClientMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

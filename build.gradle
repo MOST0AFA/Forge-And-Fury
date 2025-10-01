@@ -1,0 +1,63 @@
+plugins {
+	id 'java'
+	id 'maven-publish'
+	id 'fabric-loom' version '1.8-SNAPSHOT'
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+repositories {
+	mavenCentral()
+	maven {
+		name = 'Fabric'
+		url = 'https://maven.fabricmc.net/'
+	}
+}
+
+dependencies {
+	minecraft 'com.mojang:minecraft:1.21'
+
+	modImplementation 'net.fabricmc:fabric-loader:0.16.10'
+	modImplementation "net.fabricmc.fabric-api:fabric-api:0.102.0+1.21"
+	mappings "net.fabricmc:yarn:1.21+build.2:v2"
+	implementation 'com.google.code.gson:gson:2.10.1'
+	compileOnly 'org.projectlombok:lombok:1.18.30'
+	annotationProcessor 'org.projectlombok:lombok:1.18.30'
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+}
+
+loom {
+	runs {
+		server {
+			ideConfigGenerated = true
+			runDir = "run/server"
+			environmentVariable "fabric.environment", "server"
+		}
+	}
+}
+
+publishing {
+	publications {
+		mavenJava(MavenPublication) {
+			from components.java
+		}
+	}
+}
+
+sourceSets {
+	main {
+		java {
+			srcDirs = ["src/main/java", "src/client/java"]
+		}
+		resources {
+			srcDirs = ["src/main/resources"]
+		}
+	}
+}

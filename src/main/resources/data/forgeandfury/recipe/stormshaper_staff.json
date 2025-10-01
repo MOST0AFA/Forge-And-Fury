@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " G ",
+    "ALA",
+    " S "
+  ],
+  "key": {
+    "G": {
+      "item": "minecraft:gold_ingot"
+    },
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    },
+    "L": {
+      "item": "minecraft:lightning_rod"
+    },
+    "S": {
+      "item": "minecraft:stick"
+    }
+  },
+  "result": {
+    "id": "forgeandfury:stormshaper_staff",
+    "count": 1
+  }
+}

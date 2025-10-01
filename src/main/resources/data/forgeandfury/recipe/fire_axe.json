@@ -1,0 +1,31 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "group": "forgeandfury_axes",
+  "pattern": [
+    "NDG",
+    "NBS",
+    " S "
+  ],
+  "key": {
+    "N": {
+      "item": "minecraft:netherite_ingot"
+    },
+    "D": {
+      "item": "minecraft:gold_ingot"
+    },
+    "G": {
+      "item": "minecraft:fire_charge"
+    },
+    "B": {
+      "item": "minecraft:blaze_rod"
+    },
+    "S": {
+      "item": "minecraft:stick"
+    }
+  },
+  "result": {
+    "id": "forgeandfury:fire_axe",
+    "count": 1
+  }
+}

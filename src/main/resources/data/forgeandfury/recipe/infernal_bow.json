@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " SM",
+    "B I",
+    " SM"
+  ],
+  "key": {
+    "S": {
+      "item": "minecraft:string"
+    },
+    "M": {
+      "item": "minecraft:magma_block"
+    },
+    "B": {
+      "item": "minecraft:blaze_rod"
+    },
+    "I": {
+      "item": "minecraft:blaze_rod"
+    }
+  },
+  "result": {
+    "id": "forgeandfury:infernal_bow",
+    "count": 1
+  }
+}

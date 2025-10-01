@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "compatibilityLevel": "JAVA_21",
+  "package": "dev.most0afa.forge.and.fury.mixin",
+  "mixins": [
+    "LivingEntityMixin",
+    "ArrowEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

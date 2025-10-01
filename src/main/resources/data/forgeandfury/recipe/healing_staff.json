@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " A ",
+    "GDG",
+    " S "
+  ],
+  "key": {
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    },
+    "G": {
+      "item": "minecraft:gold_ingot"
+    },
+    "D": {
+      "item": "minecraft:glowstone_dust"
+    },
+    "S": {
+      "item": "minecraft:stick"
+    }
+  },
+  "result": {
+    "id": "forgeandfury:healing_staff",
+    "count": 1
+  }
+}

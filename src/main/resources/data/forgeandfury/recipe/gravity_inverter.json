@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "FEF",
+    "ADA",
+    "FEF"
+  ],
+  "key": {
+    "F": {
+      "item": "minecraft:feather"
+    },
+    "E": {
+      "item": "minecraft:ender_pearl"
+    },
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    },
+    "D": {
+      "item": "minecraft:diamond"
+    }
+  },
+  "result": {
+    "id": "forgeandfury:gravity_inverter",
+    "count": 1
+  }
+}

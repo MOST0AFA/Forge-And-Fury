@@ -1,0 +1,17 @@
+{
+  "item.forgeandfury.fire_axe": " Fire Axe",
+  "item.forgeandfury.infernal_bow": "Infernal Bow",
+  "item.forgeandfury.frozen_fang": "Frozen Fang",
+  "item.forgeandfury.ruiner": "Ruiner",
+  "item.forgeandfury.stormfang": "Stormfang",
+  "item.forgeandfury.duskrend": "Duskrend",
+  "item.forgeandfury.titans_hammer": "Titan's Hammer",
+  "item.forgeandfury.healing_staff": "Healing Staff",
+  "item.forgeandfury.stormcaller_bow": "Stormcaller Bow",
+  "item.forgeandfury.stormshaper_staff": "Stormshaper Staff",
+  "item.forgeandfury.gravity_inverter": "Gravity Inverter",
+  "msg.forgeandfury.ability_select": "Selected Ability: %s",
+  "msg.forgeandfury.ability_activate.fireball": "Casting Fireball!",
+  "msg.forgeandfury.ability_activate.fire_rain": "Summoning Fire Rain!",
+  "msg.forgeandfury.ability_activate.flaming_swing": "Swinging with Flames!"
+}

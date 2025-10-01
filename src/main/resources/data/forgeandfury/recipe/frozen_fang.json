@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    " P ",
+    " IS"
+  ],
+  "key": {
+    "P": { "item": "minecraft:packed_ice" },
+    "I": { "item": "minecraft:iron_sword" },
+    "S": { "item": "minecraft:snowball" }
+  },
+  "result": {
+    "id": "forgeandfury:frozen_fang",
+    "count": 1
+  }
+}
