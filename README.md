@@ -1,11 +1,11 @@
 Forge & Fury is a content expansion mod for Minecraft that introduces a range of unique, enchantment-inspired weapons and tools—each offering special powers, mechanics, and effects to enhance combat and exploration.
 
 NEW ITEMS
-Duskrend – A dark-themed blade with increased damage at night or in shadows.
+Duskrend – A dark-themed blade that deals lifesteal to all entities hit.
 
-Fire Axe – Sets enemies ablaze and ignites logs with a single swing.
+Fire Axe – Has several fire abilities..
 
-Frozen Fang – Inflicts slowness and freezes water beneath your feet.
+Frozen Fang – Inflicts slowness.
 
 Gravity Inverter – Reverses gravity for mobs on hit and right click to gain levitation.
 
