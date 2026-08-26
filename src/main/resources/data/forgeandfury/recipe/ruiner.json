@@ -6,18 +6,10 @@
     " S "
   ],
   "key": {
-    "N": {
-      "item": "minecraft:netherite_ingot"
-    },
-    "O": {
-      "item": "minecraft:obsidian"
-    },
-    "D": {
-      "item": "minecraft:diamond_block"
-    },
-    "S": {
-      "item": "minecraft:stick"
-    }
+    "N": "minecraft:netherite_ingot",
+    "O": "minecraft:obsidian",
+    "D": "minecraft:diamond_block",
+    "S": "minecraft:stick"
   },
   "result": {
     "id": "forgeandfury:ruiner",

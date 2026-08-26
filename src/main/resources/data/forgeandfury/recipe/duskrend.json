@@ -7,9 +7,9 @@
     "S  "
   ],
   "key": {
-    "W": { "item": "minecraft:wither_skeleton_skull" },
-    "S": { "item": "minecraft:stick" },
-    "O": { "item": "minecraft:obsidian" }
+    "W": "minecraft:wither_skeleton_skull",
+    "S": "minecraft:stick",
+    "O": "minecraft:obsidian"
   },
   "result": {
     "id": "forgeandfury:duskrend",

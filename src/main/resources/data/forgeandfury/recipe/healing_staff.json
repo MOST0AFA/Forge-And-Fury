@@ -6,18 +6,10 @@
     " S "
   ],
   "key": {
-    "A": {
-      "item": "minecraft:amethyst_shard"
-    },
-    "G": {
-      "item": "minecraft:gold_ingot"
-    },
-    "D": {
-      "item": "minecraft:glowstone_dust"
-    },
-    "S": {
-      "item": "minecraft:stick"
-    }
+    "A": "minecraft:amethyst_shard",
+    "G": "minecraft:gold_ingot",
+    "D": "minecraft:glowstone_dust",
+    "S": "minecraft:stick"
   },
   "result": {
     "id": "forgeandfury:healing_staff",

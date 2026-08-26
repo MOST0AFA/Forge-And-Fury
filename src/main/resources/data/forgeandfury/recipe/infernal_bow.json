@@ -6,18 +6,10 @@
     " SM"
   ],
   "key": {
-    "S": {
-      "item": "minecraft:string"
-    },
-    "M": {
-      "item": "minecraft:magma_block"
-    },
-    "B": {
-      "item": "minecraft:blaze_rod"
-    },
-    "I": {
-      "item": "minecraft:blaze_rod"
-    }
+    "S": "minecraft:string",
+    "M": "minecraft:magma_block",
+    "B": "minecraft:blaze_rod",
+    "I": "minecraft:blaze_rod"
   },
   "result": {
     "id": "forgeandfury:infernal_bow",

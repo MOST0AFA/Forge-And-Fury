@@ -1,9 +1,9 @@
 {
 	"schemaVersion": 1,
 	"id": "forgeandfury",
-	"version": "1.0.0",
+	"version": "${version}",
 	"name": "Forge & Fury",
-	"description": "A mod that adds powerful enchanted weapons",
+	"description": "A content expansion mod that adds unique weapons and tools with hand-scripted active abilities.",
 	"authors": ["MOST0AFA"],
 	"contact": {
 		"sources": "https://github.com/MOST0AFA/ForgeAndFury"	
@@ -24,8 +24,9 @@
 
 	],
 	"depends": {
-		"fabricloader": ">=0.14.21",
-		"minecraft": "1.21",
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
 		"fabric-api": "*"
 	}
 }

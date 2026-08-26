@@ -1,30 +1,28 @@
 package dev.most0afa.forge.and.fury.Items;
 
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.AttributeModifiersComponent;
-import net.minecraft.component.type.AttributeModifierSlot;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.attribute.EntityAttributeModifier;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.TypedActionResult;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.world.World;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.entity.projectile.ProjectileUtil;
-import net.minecraft.util.math.Box;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.Vec3;
 
 public class GravityInverter extends Item {
     private static final int LEVITATION_DURATION = 100;
@@ -32,88 +30,85 @@ public class GravityInverter extends Item {
     private static final double RAYCAST_DISTANCE = 8.0;
     private static final int SLOW_FALLING_BUFFER = 60;
 
-    public GravityInverter(Settings settings) {
-        super(settings.maxCount(1).fireproof().component(DataComponentTypes.ATTRIBUTE_MODIFIERS,
-                AttributeModifiersComponent.builder()
-                        .add(EntityAttributes.GENERIC_ATTACK_DAMAGE,
-                                new EntityAttributeModifier(Identifier.of("base_attack_damage"),
-                                        0.0, EntityAttributeModifier.Operation.ADD_VALUE),
-                                AttributeModifierSlot.MAINHAND)
-                        .add(EntityAttributes.GENERIC_ATTACK_SPEED,
-                                new EntityAttributeModifier(Identifier.of("base_attack_speed"),
-                                        -1.5, EntityAttributeModifier.Operation.ADD_VALUE),
-                                AttributeModifierSlot.MAINHAND)
+    public GravityInverter(Item.Properties properties) {
+        super(properties.stacksTo(1).fireResistant().attributes(
+                ItemAttributeModifiers.builder()
+                        .add(Attributes.ATTACK_DAMAGE,
+                                new AttributeModifier(Identifier.fromNamespaceAndPath("forgeandfury", "base_attack_damage"),
+                                        0.0, AttributeModifier.Operation.ADD_VALUE),
+                                EquipmentSlotGroup.MAINHAND)
+                        .add(Attributes.ATTACK_SPEED,
+                                new AttributeModifier(Identifier.fromNamespaceAndPath("forgeandfury", "base_attack_speed"),
+                                        -1.5, AttributeModifier.Operation.ADD_VALUE),
+                                EquipmentSlotGroup.MAINHAND)
                         .build()));
     }
 
     @Override
-    public TypedActionResult<ItemStack> use(World world, PlayerEntity player, Hand hand) {
-        ItemStack stack = player.getStackInHand(hand);
+    public InteractionResult use(Level level, Player player, InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
 
-        if (world.isClient) {
-            return TypedActionResult.success(stack);
+        if (level.isClientSide()) {
+            return InteractionResult.SUCCESS;
         }
 
-        if (player.getItemCooldownManager().isCoolingDown(this)) {
-            return TypedActionResult.fail(stack);
+        if (player.getCooldowns().isOnCooldown(stack)) {
+            return InteractionResult.FAIL;
         }
 
         try {
             boolean success;
 
-            if (player.isSneaking()) {
-                success = handleTargetMode(world, player);
+            if (player.isShiftKeyDown()) {
+                success = handleTargetMode(level, player);
             } else {
-                success = handleSelfMode(world, player);
+                success = handleSelfMode(level, player);
             }
 
             if (success) {
-                player.getItemCooldownManager().set(this, COOLDOWN_TICKS);
-                return TypedActionResult.success(stack);
+                player.getCooldowns().addCooldown(stack, COOLDOWN_TICKS);
+                return InteractionResult.SUCCESS;
             } else {
-                return TypedActionResult.fail(stack);
+                return InteractionResult.FAIL;
             }
 
         } catch (Exception e) {
-            System.err.println("GravityInverter error for player " + player.getName().getString() + ": " + e.getMessage());
-            e.printStackTrace();
-
-            player.sendMessage(Text.literal("§cGravity Inverter malfunctioned!"), true);
-            return TypedActionResult.fail(stack);
+            player.sendOverlayMessage(Component.literal("§cGravity Inverter malfunctioned!"));
+            return InteractionResult.FAIL;
         }
     }
 
-    private boolean handleSelfMode(World world, PlayerEntity player) {
+    private boolean handleSelfMode(Level level, Player player) {
         if (applyLevitationEffects(player)) {
-            world.playSound(null, player.getX(), player.getY(), player.getZ(),
-                    SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1.0F, 1.2F);
+            level.playSound(null, player.getX(), player.getY(), player.getZ(),
+                    SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, 1.2F);
 
-            spawnLevitationParticles(world, player);
-            player.sendMessage(Text.literal("§bLevitating Self!"), true);
+            spawnLevitationParticles(level, player);
+            player.sendOverlayMessage(Component.literal("§bLevitating Self!"));
             return true;
         } else {
-            player.sendMessage(Text.literal("§cFailed to levitate!"), true);
+            player.sendOverlayMessage(Component.literal("§cFailed to levitate!"));
             return false;
         }
     }
 
-    private boolean handleTargetMode(World world, PlayerEntity player) {
-        LivingEntity target = getTargetEntity(world, player);
+    private boolean handleTargetMode(Level level, Player player) {
+        LivingEntity target = getTargetEntity(level, player);
 
         if (target == null) {
-            player.sendMessage(Text.literal("§cNo target found within " + (int)RAYCAST_DISTANCE + " blocks!"), true);
+            player.sendOverlayMessage(Component.literal("§cNo target found within " + (int) RAYCAST_DISTANCE + " blocks!"));
             return false;
         }
 
         if (applyLevitationEffects(target)) {
-            world.playSound(null, target.getX(), target.getY(), target.getZ(),
-                    SoundEvents.ENTITY_ENDERMAN_TELEPORT, SoundCategory.PLAYERS, 1.0F, 1.5F);
+            level.playSound(null, target.getX(), target.getY(), target.getZ(),
+                    SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, 1.5F);
 
-            spawnLevitationParticles(world, target);
-            player.sendMessage(Text.literal("§bLevitating Entity: §e" + target.getName().getString()), true);
+            spawnLevitationParticles(level, target);
+            player.sendOverlayMessage(Component.literal("§bLevitating Entity: §e" + target.getName().getString()));
             return true;
         } else {
-            player.sendMessage(Text.literal("§cTarget is immune to levitation!"), true);
+            player.sendOverlayMessage(Component.literal("§cTarget is immune to levitation!"));
             return false;
         }
     }
@@ -123,16 +118,16 @@ public class GravityInverter extends Item {
             return false;
         }
 
-        if (target.isInvulnerable() || target.hasStatusEffect(StatusEffects.LEVITATION)) {
+        if (target.isInvulnerable() || target.hasEffect(MobEffects.LEVITATION)) {
             return false;
         }
 
         try {
-            target.removeStatusEffect(StatusEffects.LEVITATION);
-            target.removeStatusEffect(StatusEffects.SLOW_FALLING);
+            target.removeEffect(MobEffects.LEVITATION);
+            target.removeEffect(MobEffects.SLOW_FALLING);
 
-            StatusEffectInstance levitation = new StatusEffectInstance(
-                    StatusEffects.LEVITATION,
+            MobEffectInstance levitation = new MobEffectInstance(
+                    MobEffects.LEVITATION,
                     LEVITATION_DURATION,
                     1,
                     false,
@@ -140,8 +135,8 @@ public class GravityInverter extends Item {
                     true
             );
 
-            StatusEffectInstance slowFalling = new StatusEffectInstance(
-                    StatusEffects.SLOW_FALLING,
+            MobEffectInstance slowFalling = new MobEffectInstance(
+                    MobEffects.SLOW_FALLING,
                     LEVITATION_DURATION + SLOW_FALLING_BUFFER,
                     0,
                     false,
@@ -149,25 +144,24 @@ public class GravityInverter extends Item {
                     true
             );
 
-            boolean levitationApplied = target.addStatusEffect(levitation);
-            target.addStatusEffect(slowFalling);
+            boolean levitationApplied = target.addEffect(levitation);
+            target.addEffect(slowFalling);
 
             return levitationApplied;
 
         } catch (Exception e) {
-            System.err.println("Failed to apply levitation effects: " + e.getMessage());
             return false;
         }
     }
 
-    private void spawnLevitationParticles(World world, LivingEntity entity) {
-        if (world instanceof ServerWorld serverWorld) {
+    private void spawnLevitationParticles(Level level, LivingEntity entity) {
+        if (level instanceof ServerLevel serverLevel) {
             for (int i = 0; i < 20; i++) {
-                double offsetX = (world.random.nextDouble() - 0.5) * 2.0;
-                double offsetY = world.random.nextDouble() * 2.0;
-                double offsetZ = (world.random.nextDouble() - 0.5) * 2.0;
+                double offsetX = (level.getRandom().nextDouble() - 0.5) * 2.0;
+                double offsetY = level.getRandom().nextDouble() * 2.0;
+                double offsetZ = (level.getRandom().nextDouble() - 0.5) * 2.0;
 
-                serverWorld.spawnParticles(
+                serverLevel.sendParticles(
                         ParticleTypes.END_ROD,
                         entity.getX() + offsetX,
                         entity.getY() + offsetY,
@@ -178,17 +172,17 @@ public class GravityInverter extends Item {
         }
     }
 
-    private LivingEntity getTargetEntity(World world, PlayerEntity player) {
-        if (player == null || world == null) return null;
+    private LivingEntity getTargetEntity(Level level, Player player) {
+        if (player == null || level == null) return null;
 
         try {
-            Vec3d start = player.getEyePos();
-            Vec3d direction = player.getRotationVector();
-            Vec3d end = start.add(direction.multiply(RAYCAST_DISTANCE));
+            Vec3 start = player.getEyePosition();
+            Vec3 direction = player.getLookAngle();
+            Vec3 end = start.add(direction.scale(RAYCAST_DISTANCE));
 
-            Box searchBox = Box.from(start).union(Box.from(end)).expand(1.0);
+            AABB searchBox = new AABB(start, end).inflate(1.0);
 
-            EntityHitResult entityHit = ProjectileUtil.raycast(
+            EntityHitResult entityHit = ProjectileUtil.getEntityHitResult(
                     player,
                     start,
                     end,
@@ -207,14 +201,13 @@ public class GravityInverter extends Item {
                 return target;
             }
         } catch (Exception e) {
-            System.err.println("Error in getTargetEntity: " + e.getMessage());
         }
 
         return null;
     }
 
     @Override
-    public boolean hasGlint(ItemStack stack) {
+    public boolean isFoil(ItemStack stack) {
         return true;
     }
 }

@@ -6,9 +6,9 @@
     " IS"
   ],
   "key": {
-    "P": { "item": "minecraft:packed_ice" },
-    "I": { "item": "minecraft:iron_sword" },
-    "S": { "item": "minecraft:snowball" }
+    "P": "minecraft:packed_ice",
+    "I": "minecraft:iron_sword",
+    "S": "minecraft:snowball"
   },
   "result": {
     "id": "forgeandfury:frozen_fang",

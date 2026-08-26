@@ -8,21 +8,11 @@
     " S "
   ],
   "key": {
-    "N": {
-      "item": "minecraft:netherite_ingot"
-    },
-    "D": {
-      "item": "minecraft:gold_ingot"
-    },
-    "G": {
-      "item": "minecraft:fire_charge"
-    },
-    "B": {
-      "item": "minecraft:blaze_rod"
-    },
-    "S": {
-      "item": "minecraft:stick"
-    }
+    "N": "minecraft:netherite_ingot",
+    "D": "minecraft:gold_ingot",
+    "G": "minecraft:fire_charge",
+    "B": "minecraft:blaze_rod",
+    "S": "minecraft:stick"
   },
   "result": {
     "id": "forgeandfury:fire_axe",

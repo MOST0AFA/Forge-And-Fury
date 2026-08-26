@@ -1,30 +1,28 @@
 package dev.most0afa.forge.and.fury.Items;
 
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.effect.StatusEffect;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.Hand;
-import net.minecraft.util.TypedActionResult;
-import net.minecraft.world.World;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.entity.attribute.EntityAttribute;
-import net.minecraft.entity.attribute.EntityAttributeModifier;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.component.type.AttributeModifiersComponent;
-import net.minecraft.component.type.AttributeModifierSlot;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.util.Identifier;
+import net.minecraft.core.Holder;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,119 +31,115 @@ public class HealingStaff extends Item {
     private static final int COOLDOWN_TICKS = 30;
     private static final float HEAL_AMOUNT = 3.0F;
 
-    public HealingStaff(Settings settings) {
-        super(settings.maxDamage(250)
-                .component(DataComponentTypes.ATTRIBUTE_MODIFIERS, createAttributeModifiers()));
-    }
-
-    private static AttributeModifiersComponent createAttributeModifiers() {
-        return AttributeModifiersComponent.builder()
-                .add(EntityAttributes.GENERIC_ATTACK_DAMAGE,
-                        new EntityAttributeModifier(
-                                Identifier.of("healing_staff", "attack_damage"),
-                                2.0,
-                                EntityAttributeModifier.Operation.ADD_VALUE),
-                        AttributeModifierSlot.MAINHAND)
-                .build();
+    public HealingStaff(Item.Properties properties) {
+        super(properties.durability(250)
+                .attributes(ItemAttributeModifiers.builder()
+                        .add(Attributes.ATTACK_DAMAGE,
+                                new AttributeModifier(
+                                        Identifier.fromNamespaceAndPath("forgeandfury", "healing_staff_attack_damage"),
+                                        2.0,
+                                        AttributeModifier.Operation.ADD_VALUE),
+                                EquipmentSlotGroup.MAINHAND)
+                        .build()));
     }
 
     @Override
-    public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
-        ItemStack stack = user.getStackInHand(hand);
+    public InteractionResult use(Level level, Player user, InteractionHand hand) {
+        ItemStack stack = user.getItemInHand(hand);
 
-        if (user.getItemCooldownManager().isCoolingDown(this)) {
-            return TypedActionResult.fail(stack);
+        if (user.getCooldowns().isOnCooldown(stack)) {
+            return InteractionResult.FAIL;
         }
 
-        if (!world.isClient) {
-            LivingEntity target = getTargetEntity(world, user);
+        if (!level.isClientSide()) {
+            LivingEntity target = getTargetEntity(level, user);
 
             if (target != null && target != user) {
-                healEntity(target, world);
-                user.sendMessage(Text.of("Healed " + target.getName().getString()), true);
+                healEntity(target, level);
+                user.sendOverlayMessage(Component.literal("Healed " + target.getName().getString()));
 
-                if (world instanceof ServerWorld serverWorld) {
-                    spawnHealingParticles(serverWorld, target);
+                if (level instanceof ServerLevel serverLevel) {
+                    spawnHealingParticles(serverLevel, target);
                 }
             } else {
-                healEntity(user, world);
-                user.sendMessage(Text.of("Self-heal activated"), true);
+                healEntity(user, level);
+                user.sendOverlayMessage(Component.literal("Self-heal activated"));
 
-                if (world instanceof ServerWorld serverWorld) {
-                    spawnHealingParticles(serverWorld, user);
+                if (level instanceof ServerLevel serverLevel) {
+                    spawnHealingParticles(serverLevel, user);
                 }
             }
 
-            stack.damage(1, user, EquipmentSlot.MAINHAND);
-            user.getItemCooldownManager().set(this, COOLDOWN_TICKS);
+            stack.hurtAndBreak(1, user, EquipmentSlot.MAINHAND);
+            user.getCooldowns().addCooldown(stack, COOLDOWN_TICKS);
 
-            world.playSound(null, user.getBlockPos(), SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP,
-                    SoundCategory.PLAYERS, 1.0F, 1.5F);
+            level.playSound(null, user.blockPosition(), SoundEvents.EXPERIENCE_ORB_PICKUP,
+                    SoundSource.PLAYERS, 1.0F, 1.5F);
         }
 
-        return TypedActionResult.success(stack);
+        return InteractionResult.SUCCESS;
     }
 
-    private void healEntity(LivingEntity entity, World world) {
+    private void healEntity(LivingEntity entity, Level level) {
         entity.heal(HEAL_AMOUNT);
 
-        if (world.random.nextFloat() < 0.3f) {
-            entity.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, 60, 0));
+        if (level.getRandom().nextFloat() < 0.3f) {
+            entity.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 60, 0));
         }
 
         if (entity.isOnFire()) {
-            entity.extinguish();
+            entity.clearFire();
         }
 
         removeBadStatusEffects(entity);
     }
 
     private void removeBadStatusEffects(LivingEntity entity) {
-        List<RegistryEntry<StatusEffect>> effectsToRemove = new ArrayList<>();
+        List<Holder<MobEffect>> effectsToRemove = new ArrayList<>();
 
-        for (StatusEffectInstance effectInstance : entity.getStatusEffects()) {
-            RegistryEntry<StatusEffect> effectType = effectInstance.getEffectType();
+        for (MobEffectInstance effectInstance : entity.getActiveEffects()) {
+            Holder<MobEffect> effectType = effectInstance.getEffect();
 
             if (!effectType.value().isBeneficial()) {
                 effectsToRemove.add(effectType);
             }
         }
 
-        for (RegistryEntry<StatusEffect> effectType : effectsToRemove) {
-            entity.removeStatusEffect(effectType);
+        for (Holder<MobEffect> effectType : effectsToRemove) {
+            entity.removeEffect(effectType);
         }
     }
 
-    private void spawnHealingParticles(ServerWorld world, LivingEntity entity) {
-        Vec3d pos = entity.getPos().add(0, entity.getHeight() / 2, 0);
+    private void spawnHealingParticles(ServerLevel level, LivingEntity entity) {
+        Vec3 pos = entity.position().add(0, entity.getBbHeight() / 2, 0);
 
         for (int i = 0; i < 10; i++) {
-            double offsetX = (world.random.nextDouble() - 0.5) * 2.0;
-            double offsetY = (world.random.nextDouble() - 0.5) * 2.0;
-            double offsetZ = (world.random.nextDouble() - 0.5) * 2.0;
+            double offsetX = (level.getRandom().nextDouble() - 0.5) * 2.0;
+            double offsetY = (level.getRandom().nextDouble() - 0.5) * 2.0;
+            double offsetZ = (level.getRandom().nextDouble() - 0.5) * 2.0;
 
-            world.spawnParticles(ParticleTypes.HEART,
+            level.sendParticles(ParticleTypes.HEART,
                     pos.x + offsetX, pos.y + offsetY, pos.z + offsetZ,
                     1, 0, 0.1, 0, 0.05);
         }
     }
 
-    private LivingEntity getTargetEntity(World world, PlayerEntity player) {
-        Vec3d start = player.getEyePos();
-        Vec3d direction = player.getRotationVector();
+    private LivingEntity getTargetEntity(Level level, Player player) {
+        Vec3 start = player.getEyePosition();
+        Vec3 direction = player.getLookAngle();
         double range = 5.0;
         LivingEntity closestEntity = null;
         double closestDistance = range;
 
-        for (LivingEntity entity : world.getEntitiesByClass(LivingEntity.class,
-                player.getBoundingBox().expand(range), e -> e != player)) {
+        for (LivingEntity entity : level.getEntitiesOfClass(LivingEntity.class,
+                player.getBoundingBox().inflate(range), e -> e != player)) {
 
-            Vec3d toEntity = entity.getPos().subtract(start);
-            Vec3d normalizedDirection = direction.normalize();
-            double dot = toEntity.normalize().dotProduct(normalizedDirection);
+            Vec3 toEntity = entity.position().subtract(start);
+            Vec3 normalizedDirection = direction.normalize();
+            double dot = toEntity.normalize().dot(normalizedDirection);
 
             if (dot > 0.8) {
-                double distance = start.distanceTo(entity.getPos());
+                double distance = start.distanceTo(entity.position());
                 if (distance < closestDistance) {
                     closestDistance = distance;
                     closestEntity = entity;

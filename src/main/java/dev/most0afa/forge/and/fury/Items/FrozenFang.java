@@ -1,50 +1,47 @@
 package dev.most0afa.forge.and.fury.Items;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.SwordItem;
-import net.minecraft.item.ToolMaterial;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ToolMaterial;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 
-public class FrozenFang extends SwordItem {
-    public FrozenFang(ToolMaterial material, Settings settings) {
-        super(material, settings.attributeModifiers(SwordItem.createAttributeModifiers(material, 3, -2.4F)));
+public class FrozenFang extends Item {
+    public FrozenFang(ToolMaterial material, Item.Properties properties) {
+        super(properties.sword(material, 3.0F, -2.4F));
     }
 
     @Override
-    public boolean postHit(ItemStack stack, LivingEntity target, LivingEntity attacker) {
-        World world = attacker.getEntityWorld();
+    public void hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+        Level level = attacker.level();
 
-        if (!world.isClient) {
-            target.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 100, 1));
+        if (!level.isClientSide()) {
+            target.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 100, 1));
 
-            stack.damage(1, attacker, EquipmentSlot.MAINHAND);
-
-            world.playSound(null, BlockPos.ofFloored(target.getPos()),
-                    SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 0.8F, 1.2F);
-            world.playSound(null, BlockPos.ofFloored(attacker.getPos()),
-                    SoundEvents.ENTITY_PLAYER_HURT_FREEZE, SoundCategory.PLAYERS, 0.5F, 1.0F);
+            level.playSound(null, BlockPos.containing(target.position()),
+                    SoundEvents.GLASS_BREAK, SoundSource.PLAYERS, 0.8F, 1.2F);
+            level.playSound(null, BlockPos.containing(attacker.position()),
+                    SoundEvents.PLAYER_HURT_FREEZE, SoundSource.PLAYERS, 0.5F, 1.0F);
         }
-        return super.postHit(stack, target, attacker);
     }
 
     @Override
-    public boolean postMine(ItemStack stack, World world, BlockState state, BlockPos pos, LivingEntity miner) {
-        if (!world.isClient && (state.isOf(Blocks.ICE) || state.isOf(Blocks.PACKED_ICE) || state.isOf(Blocks.BLUE_ICE))) {
-            stack.damage(1, miner, EquipmentSlot.MAINHAND);
+    public boolean mineBlock(ItemStack stack, Level level, BlockState state, BlockPos pos, LivingEntity miner) {
+        if (!level.isClientSide() && (state.is(Blocks.ICE) || state.is(Blocks.PACKED_ICE) || state.is(Blocks.BLUE_ICE))) {
+            stack.hurtAndBreak(1, miner, EquipmentSlot.MAINHAND);
 
-            world.playSound(null, pos, SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.BLOCKS, 1.0F, 1.2F);
-            world.playSound(null, BlockPos.ofFloored(miner.getPos()),
-                    SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, SoundCategory.PLAYERS, 0.3F, 1.5F);
+            level.playSound(null, pos, SoundEvents.GLASS_BREAK, SoundSource.BLOCKS, 1.0F, 1.2F);
+            level.playSound(null, BlockPos.containing(miner.position()),
+                    SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.3F, 1.5F);
         }
-        return super.postMine(stack, world, state, pos, miner);
+        return super.mineBlock(stack, level, state, pos, miner);
     }
 }

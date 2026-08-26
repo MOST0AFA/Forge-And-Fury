@@ -1,58 +1,63 @@
 package dev.most0afa.forge.and.fury.Items;
 
-import net.minecraft.block.BlockState;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.attribute.EntityAttributeModifier;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ToolItem;
-import net.minecraft.item.ToolMaterials;
-import net.minecraft.item.ItemStack;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.registry.tag.BlockTags;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
-import net.minecraft.component.type.AttributeModifiersComponent;
-import net.minecraft.component.type.AttributeModifierSlot;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.EquipmentSlotGroup;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.ToolMaterial;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class Ruiner extends ToolItem {
+public class Ruiner extends Item {
     private static final int MAX_HARDNESS = 50;
 
-    public Ruiner(ToolMaterials material, Settings settings) {
-        super(material, settings.maxDamage(2048).attributeModifiers(
-                AttributeModifiersComponent.builder()
-                        .add(EntityAttributes.GENERIC_ATTACK_DAMAGE,
-                                new EntityAttributeModifier(ToolItem.BASE_ATTACK_DAMAGE_MODIFIER_ID, 6.0, EntityAttributeModifier.Operation.ADD_VALUE),
-                                AttributeModifierSlot.MAINHAND)
-                        .add(EntityAttributes.GENERIC_ATTACK_SPEED,
-                                new EntityAttributeModifier(ToolItem.BASE_ATTACK_SPEED_MODIFIER_ID, -2.8, EntityAttributeModifier.Operation.ADD_VALUE),
-                                AttributeModifierSlot.MAINHAND)
-                        .build()
-        ));
-    }
-
-    public boolean isSuitableFor(BlockState state) {
-        return state.isIn(BlockTags.PICKAXE_MINEABLE);
+    public Ruiner(ToolMaterial material, Item.Properties properties) {
+        super(properties
+                .tool(material, BlockTags.MINEABLE_WITH_PICKAXE, 0.0F, 0.0F, 0.0F)
+                .durability(2048)
+                .attributes(ItemAttributeModifiers.builder()
+                        .add(Attributes.ATTACK_DAMAGE,
+                                new AttributeModifier(Identifier.fromNamespaceAndPath("forgeandfury", "ruiner_attack_damage"), 6.0,
+                                        AttributeModifier.Operation.ADD_VALUE),
+                                EquipmentSlotGroup.MAINHAND)
+                        .add(Attributes.ATTACK_SPEED,
+                                new AttributeModifier(Identifier.fromNamespaceAndPath("forgeandfury", "ruiner_attack_speed"), -2.8,
+                                        AttributeModifier.Operation.ADD_VALUE),
+                                EquipmentSlotGroup.MAINHAND)
+                        .build()));
     }
 
     @Override
-    public float getMiningSpeed(ItemStack stack, BlockState state) {
-        if (state.isIn(BlockTags.PICKAXE_MINEABLE)) {
+    public boolean isCorrectToolForDrops(ItemStack stack, BlockState state) {
+        return state.is(BlockTags.MINEABLE_WITH_PICKAXE);
+    }
+
+    @Override
+    public float getDestroySpeed(ItemStack stack, BlockState state) {
+        if (state.is(BlockTags.MINEABLE_WITH_PICKAXE)) {
             return 9.0f;
         }
-        return super.getMiningSpeed(stack, state);
+        return super.getDestroySpeed(stack, state);
     }
 
     @Override
-    public boolean postMine(ItemStack stack, World world, BlockState state, BlockPos pos, LivingEntity miner) {
-        if (!world.isClient && miner instanceof PlayerEntity player) {
+    public boolean mineBlock(ItemStack stack, Level level, BlockState state, BlockPos pos, LivingEntity miner) {
+        if (!level.isClientSide() && miner instanceof Player player) {
             List<BlockPos> blocksToBreak = new ArrayList<>();
             int totalHardness = 0;
 
@@ -61,49 +66,49 @@ public class Ruiner extends ToolItem {
                     for (int z = -1; z <= 1; z++) {
                         if (x == 0 && y == 0 && z == 0) continue;
 
-                        BlockPos targetPos = pos.add(x, y, z);
-                        BlockState targetState = world.getBlockState(targetPos);
-                        float hardness = targetState.getHardness(world, targetPos);
+                        BlockPos targetPos = pos.offset(x, y, z);
+                        BlockState targetState = level.getBlockState(targetPos);
+                        float hardness = targetState.getDestroySpeed(level, targetPos);
 
                         if (hardness >= 0 && hardness <= MAX_HARDNESS && !targetState.isAir()) {
                             blocksToBreak.add(targetPos);
-                            totalHardness += Math.max(1, (int)hardness);
+                            totalHardness += Math.max(1, (int) hardness);
                         }
                     }
                 }
             }
 
             if (!blocksToBreak.isEmpty()) {
-                createDestructionEffect(world, pos, blocksToBreak.size());
+                createDestructionEffect(level, pos, blocksToBreak.size());
 
                 for (BlockPos targetPos : blocksToBreak) {
-                    world.breakBlock(targetPos, true, miner);
+                    level.destroyBlock(targetPos, true, miner, 512);
 
-                    if (world instanceof ServerWorld serverWorld) {
-                        spawnBreakParticles(serverWorld, targetPos);
+                    if (level instanceof ServerLevel serverLevel) {
+                        spawnBreakParticles(serverLevel, targetPos);
                     }
                 }
 
                 int damageAmount = Math.max(1, totalHardness / 10);
-                stack.damage(damageAmount, player, EquipmentSlot.MAINHAND);
+                stack.hurtAndBreak(damageAmount, player, EquipmentSlot.MAINHAND);
 
-                world.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
-                        SoundEvents.ENTITY_GENERIC_EXPLODE, SoundCategory.BLOCKS, 0.8F, 1.2F);
+                level.playSound(null, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
+                        SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 0.8F, 1.2F);
             }
         }
-        return super.postMine(stack, world, state, pos, miner);
+        return super.mineBlock(stack, level, state, pos, miner);
     }
 
-    private void createDestructionEffect(World world, BlockPos center, int blockCount) {
-        if (world instanceof ServerWorld serverWorld) {
+    private void createDestructionEffect(Level level, BlockPos center, int blockCount) {
+        if (level instanceof ServerLevel serverLevel) {
             int particleCount = Math.min(50, blockCount * 3);
 
             for (int i = 0; i < particleCount; i++) {
-                double offsetX = (world.getRandom().nextDouble() - 0.5) * 4.0;
-                double offsetY = (world.getRandom().nextDouble() - 0.5) * 4.0;
-                double offsetZ = (world.getRandom().nextDouble() - 0.5) * 4.0;
+                double offsetX = (level.getRandom().nextDouble() - 0.5) * 4.0;
+                double offsetY = (level.getRandom().nextDouble() - 0.5) * 4.0;
+                double offsetZ = (level.getRandom().nextDouble() - 0.5) * 4.0;
 
-                serverWorld.spawnParticles(ParticleTypes.EXPLOSION,
+                serverLevel.sendParticles(ParticleTypes.EXPLOSION,
                         center.getX() + 0.5 + offsetX,
                         center.getY() + 0.5 + offsetY,
                         center.getZ() + 0.5 + offsetZ,
@@ -111,11 +116,11 @@ public class Ruiner extends ToolItem {
             }
 
             for (int i = 0; i < blockCount; i++) {
-                double offsetX = (world.getRandom().nextDouble() - 0.5) * 3.0;
-                double offsetY = world.getRandom().nextDouble() * 2.0;
-                double offsetZ = (world.getRandom().nextDouble() - 0.5) * 3.0;
+                double offsetX = (level.getRandom().nextDouble() - 0.5) * 3.0;
+                double offsetY = level.getRandom().nextDouble() * 2.0;
+                double offsetZ = (level.getRandom().nextDouble() - 0.5) * 3.0;
 
-                serverWorld.spawnParticles(ParticleTypes.LARGE_SMOKE,
+                serverLevel.sendParticles(ParticleTypes.LARGE_SMOKE,
                         center.getX() + 0.5 + offsetX,
                         center.getY() + 0.5 + offsetY,
                         center.getZ() + 0.5 + offsetZ,
@@ -124,16 +129,11 @@ public class Ruiner extends ToolItem {
         }
     }
 
-    private void spawnBreakParticles(ServerWorld world, BlockPos pos) {
-        if (world.getRandom().nextFloat() < 0.4f) {
-            world.spawnParticles(ParticleTypes.CLOUD,
+    private void spawnBreakParticles(ServerLevel level, BlockPos pos) {
+        if (level.getRandom().nextFloat() < 0.4f) {
+            level.sendParticles(ParticleTypes.CLOUD,
                     pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
                     3, 0.3, 0.3, 0.3, 0.02);
         }
-    }
-
-    @Override
-    public boolean canRepair(ItemStack stack, ItemStack ingredient) {
-        return ToolMaterials.NETHERITE.getRepairIngredient().test(ingredient);
     }
 }

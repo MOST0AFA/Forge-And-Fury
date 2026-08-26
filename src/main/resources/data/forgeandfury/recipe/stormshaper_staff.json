@@ -6,18 +6,10 @@
     " S "
   ],
   "key": {
-    "G": {
-      "item": "minecraft:gold_ingot"
-    },
-    "A": {
-      "item": "minecraft:amethyst_shard"
-    },
-    "L": {
-      "item": "minecraft:lightning_rod"
-    },
-    "S": {
-      "item": "minecraft:stick"
-    }
+    "G": "minecraft:gold_ingot",
+    "A": "minecraft:amethyst_shard",
+    "L": "minecraft:lightning_rod",
+    "S": "minecraft:stick"
   },
   "result": {
     "id": "forgeandfury:stormshaper_staff",

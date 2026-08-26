@@ -1,29 +1,30 @@
 package dev.most0afa.forge.and.fury.Items;
 
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.LightningEntity;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.Hand;
-import net.minecraft.util.TypedActionResult;
-import net.minecraft.util.UseAction;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.util.math.Box;
-import net.minecraft.world.World;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.text.Text;
-import net.minecraft.block.Blocks;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.EntityTypes;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LightningBolt;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ClipContext;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.HashMap;
 import java.util.List;
@@ -33,61 +34,66 @@ public class StormShaperStaff extends Item {
     private static final int COOLDOWN_TICKS = 80;
     private static final int STORM_TRIGGER_USES = 5;
     private static final int STORM_WINDOW_TICKS = 1200;
-    private static final Map<PlayerEntity, List<Long>> useHistory = new HashMap<>();
+    private static final Map<Player, List<Long>> useHistory = new HashMap<>();
 
-    public StormShaperStaff(Settings settings) {
-        super(settings.maxCount(1).maxDamage(384));
+    public StormShaperStaff(Item.Properties properties) {
+        super(properties.durability(384).enchantable(15));
     }
 
     @Override
-    public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
-        ItemStack stack = user.getStackInHand(hand);
+    public InteractionResult use(Level level, Player user, InteractionHand hand) {
+        ItemStack stack = user.getItemInHand(hand);
 
-        if (!world.isClient) {
-            if (user.getItemCooldownManager().isCoolingDown(this)) {
-                return TypedActionResult.fail(stack);
+        if (!level.isClientSide()) {
+            if (user.getCooldowns().isOnCooldown(stack)) {
+                return InteractionResult.FAIL;
             }
 
-            HitResult hitResult = user.raycast(50.0, 1.0f, false);
-            BlockPos targetPos;
+            BlockPos targetPos = raycastTargetPos(level, user);
 
-            if (hitResult instanceof BlockHitResult blockHit) {
-                targetPos = blockHit.getBlockPos().up();
-            } else {
-                Vec3d lookVec = user.getRotationVec(1.0f);
-                Vec3d targetVec = user.getEyePos().add(lookVec.multiply(20.0));
-                targetPos = BlockPos.ofFloored(targetVec);
-            }
+            createCastingEffects(level, user);
+            summonLightning((ServerLevel) level, targetPos);
+            summonAdditionalLightning((ServerLevel) level, targetPos, 4);
 
-            createCastingEffects(world, user);
-            summonLightning((ServerWorld) world, targetPos);
-            summonAdditionalLightning((ServerWorld) world, targetPos, 4);
+            level.playSound(null, user.getX(), user.getY(), user.getZ(),
+                    SoundEvents.LIGHTNING_BOLT_THUNDER, SoundSource.PLAYERS, 1.0F, 1.5F);
 
-            world.playSound(null, user.getX(), user.getY(), user.getZ(),
-                    SoundEvents.ENTITY_LIGHTNING_BOLT_THUNDER, SoundCategory.PLAYERS, 1.0F, 1.5F);
+            level.playSound(null, user.getX(), user.getY(), user.getZ(),
+                    SoundEvents.ENCHANTMENT_TABLE_USE, SoundSource.PLAYERS, 0.8F, 0.8F);
 
-            world.playSound(null, user.getX(), user.getY(), user.getZ(),
-                    SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE, SoundCategory.PLAYERS, 0.8F, 0.8F);
-
-            stack.damage(1, user, EquipmentSlot.MAINHAND);
-            user.getItemCooldownManager().set(this, COOLDOWN_TICKS);
-            trackUsage(user, (ServerWorld) world);
+            stack.hurtAndBreak(1, user, EquipmentSlot.MAINHAND);
+            user.getCooldowns().addCooldown(stack, COOLDOWN_TICKS);
+            trackUsage(user, (ServerLevel) level);
         }
 
-        return TypedActionResult.success(stack, world.isClient());
+        return InteractionResult.SUCCESS;
     }
 
-    private void createCastingEffects(World world, PlayerEntity user) {
-        if (!(world instanceof ServerWorld serverWorld)) return;
+    private BlockPos raycastTargetPos(Level level, Player user) {
+        Vec3 eyePos = user.getEyePosition();
+        Vec3 lookVec = user.getLookAngle();
+        Vec3 endVec = eyePos.add(lookVec.scale(50.0));
+
+        BlockHitResult hitResult = level.clip(new ClipContext(eyePos, endVec,
+                ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, user));
+
+        if (hitResult.getType() == HitResult.Type.BLOCK) {
+            return hitResult.getBlockPos().above();
+        }
+        return BlockPos.containing(endVec);
+    }
+
+    private void createCastingEffects(Level level, Player user) {
+        if (!(level instanceof ServerLevel serverLevel)) return;
 
         for (int i = 0; i < 15; i++) {
             double angle = (i / 15.0) * 2 * Math.PI;
-            double radius = 2.0 + serverWorld.random.nextDouble() * 0.5;
+            double radius = 2.0 + serverLevel.getRandom().nextDouble() * 0.5;
             double x = user.getX() + Math.cos(angle) * radius;
             double z = user.getZ() + Math.sin(angle) * radius;
-            double y = user.getY() + 1.5 + serverWorld.random.nextDouble() * 0.5;
+            double y = user.getY() + 1.5 + serverLevel.getRandom().nextDouble() * 0.5;
 
-            serverWorld.spawnParticles(ParticleTypes.CLOUD,
+            serverLevel.sendParticles(ParticleTypes.CLOUD,
                     x, y, z, 1, 0.1, 0.1, 0.1, 0.02);
         }
 
@@ -98,16 +104,16 @@ public class StormShaperStaff extends Item {
             double y = user.getY() + 1.0 + (t / (4 * Math.PI)) * 1.5;
             double z = user.getZ() + Math.sin(t) * radius * Math.sin(t * 0.5);
 
-            serverWorld.spawnParticles(ParticleTypes.ELECTRIC_SPARK,
+            serverLevel.sendParticles(ParticleTypes.ELECTRIC_SPARK,
                     x, y, z, 1, 0, 0, 0, 0.1);
         }
 
         for (int i = 0; i < 8; i++) {
-            double offsetX = serverWorld.random.nextGaussian() * 0.3;
-            double offsetY = serverWorld.random.nextDouble() * 0.8 + 0.5;
-            double offsetZ = serverWorld.random.nextGaussian() * 0.3;
+            double offsetX = serverLevel.getRandom().nextGaussian() * 0.3;
+            double offsetY = serverLevel.getRandom().nextDouble() * 0.8 + 0.5;
+            double offsetZ = serverLevel.getRandom().nextGaussian() * 0.3;
 
-            serverWorld.spawnParticles(ParticleTypes.ENCHANT,
+            serverLevel.sendParticles(ParticleTypes.ENCHANT,
                     user.getX() + offsetX,
                     user.getY() + offsetY,
                     user.getZ() + offsetZ,
@@ -115,37 +121,41 @@ public class StormShaperStaff extends Item {
         }
     }
 
-    private void summonLightning(ServerWorld serverWorld, BlockPos pos) {
-        LightningEntity lightning = new LightningEntity(EntityType.LIGHTNING_BOLT, serverWorld);
-        lightning.refreshPositionAfterTeleport(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
-        serverWorld.spawnEntity(lightning);
+    private void summonLightning(ServerLevel serverLevel, BlockPos pos) {
+        LightningBolt lightning = EntityTypes.LIGHTNING_BOLT.create(serverLevel, EntitySpawnReason.TRIGGERED);
+        if (lightning != null) {
+            lightning.snapTo(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
+            serverLevel.addFreshEntity(lightning);
+        }
 
-        createEnvironmentalEffects(serverWorld, pos);
-        createChainLightning(serverWorld, pos);
-        createBlockEffects(serverWorld, pos);
+        createEnvironmentalEffects(serverLevel, pos);
+        createChainLightning(serverLevel, pos);
+        createBlockEffects(serverLevel, pos);
     }
 
-    private void summonAdditionalLightning(ServerWorld serverWorld, BlockPos centerPos, int count) {
+    private void summonAdditionalLightning(ServerLevel serverLevel, BlockPos centerPos, int count) {
         for (int i = 0; i < count; i++) {
             double angle = (i / (double) count) * 2 * Math.PI;
-            double radius = 8.0 + serverWorld.random.nextDouble() * 4.0;
+            double radius = 8.0 + serverLevel.getRandom().nextDouble() * 4.0;
             int offsetX = (int) Math.round(Math.cos(angle) * radius);
             int offsetZ = (int) Math.round(Math.sin(angle) * radius);
-            BlockPos strikePos = centerPos.add(offsetX, 0, offsetZ);
+            BlockPos strikePos = centerPos.offset(offsetX, 0, offsetZ);
 
-            LightningEntity lightning = new LightningEntity(EntityType.LIGHTNING_BOLT, serverWorld);
-            lightning.refreshPositionAfterTeleport(strikePos.getX() + 0.5, strikePos.getY(), strikePos.getZ() + 0.5);
-            serverWorld.spawnEntity(lightning);
+            LightningBolt lightning = EntityTypes.LIGHTNING_BOLT.create(serverLevel, EntitySpawnReason.TRIGGERED);
+            if (lightning != null) {
+                lightning.snapTo(strikePos.getX() + 0.5, strikePos.getY(), strikePos.getZ() + 0.5);
+                serverLevel.addFreshEntity(lightning);
+            }
         }
     }
 
-    private void createEnvironmentalEffects(ServerWorld serverWorld, BlockPos pos) {
+    private void createEnvironmentalEffects(ServerLevel serverLevel, BlockPos pos) {
         for (int i = 0; i < 50; i++) {
-            double offsetX = serverWorld.random.nextGaussian() * 3.0;
-            double offsetY = serverWorld.random.nextDouble() * 5.0;
-            double offsetZ = serverWorld.random.nextGaussian() * 3.0;
+            double offsetX = serverLevel.getRandom().nextGaussian() * 3.0;
+            double offsetY = serverLevel.getRandom().nextDouble() * 5.0;
+            double offsetZ = serverLevel.getRandom().nextGaussian() * 3.0;
 
-            serverWorld.spawnParticles(ParticleTypes.ELECTRIC_SPARK,
+            serverLevel.sendParticles(ParticleTypes.ELECTRIC_SPARK,
                     pos.getX() + 0.5 + offsetX,
                     pos.getY() + offsetY,
                     pos.getZ() + 0.5 + offsetZ,
@@ -153,145 +163,119 @@ public class StormShaperStaff extends Item {
         }
 
         for (int i = 0; i < 20; i++) {
-            double offsetX = serverWorld.random.nextGaussian() * 2.0;
-            double offsetY = serverWorld.random.nextDouble() * 2.0;
-            double offsetZ = serverWorld.random.nextGaussian() * 2.0;
+            double offsetX = serverLevel.getRandom().nextGaussian() * 2.0;
+            double offsetY = serverLevel.getRandom().nextDouble() * 2.0;
+            double offsetZ = serverLevel.getRandom().nextGaussian() * 2.0;
 
-            serverWorld.spawnParticles(ParticleTypes.EXPLOSION,
+            serverLevel.sendParticles(ParticleTypes.EXPLOSION,
                     pos.getX() + 0.5 + offsetX,
                     pos.getY() + offsetY,
                     pos.getZ() + 0.5 + offsetZ,
                     1, 0, 0, 0, 0);
         }
 
-        serverWorld.playSound(null, pos.getX(), pos.getY(), pos.getZ(),
-                SoundEvents.ENTITY_LIGHTNING_BOLT_IMPACT, SoundCategory.BLOCKS, 1.2F, 1.0F);
+        serverLevel.playSound(null, pos.getX(), pos.getY(), pos.getZ(),
+                SoundEvents.LIGHTNING_BOLT_IMPACT, SoundSource.BLOCKS, 1.2F, 1.0F);
 
-        serverWorld.playSound(null, pos.getX(), pos.getY(), pos.getZ(),
-                SoundEvents.ENTITY_GENERIC_EXPLODE, SoundCategory.BLOCKS, 0.8F, 1.5F);
+        serverLevel.playSound(null, pos.getX(), pos.getY(), pos.getZ(),
+                SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS, 0.8F, 1.5F);
     }
 
-    private void createChainLightning(ServerWorld serverWorld, BlockPos pos) {
-        List<LivingEntity> nearbyEntities = serverWorld.getEntitiesByClass(LivingEntity.class,
-                new Box(pos).expand(6.0), entity -> entity.isAlive());
+    private void createChainLightning(ServerLevel serverLevel, BlockPos pos) {
+        List<LivingEntity> nearbyEntities = serverLevel.getEntitiesOfClass(LivingEntity.class,
+                new AABB(pos).inflate(6.0), LivingEntity::isAlive);
 
         int affectedCount = 0;
         for (LivingEntity entity : nearbyEntities) {
             if (affectedCount >= 5) break;
 
-            createChainLightningVisual(serverWorld, pos, entity.getBlockPos());
+            createChainLightningVisual(serverLevel, pos, entity.blockPosition());
 
             float damage = 6.0F - (affectedCount * 1.0F);
-            entity.damage(serverWorld.getDamageSources().lightningBolt(), damage);
+            entity.hurtServer(serverLevel, serverLevel.damageSources().lightningBolt(), damage);
 
-            entity.addStatusEffect(new StatusEffectInstance(StatusEffects.WEAKNESS, 120, 1));
-            entity.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 80, 1));
-            entity.addStatusEffect(new StatusEffectInstance(StatusEffects.GLOWING, 160, 0));
+            entity.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, 120, 1));
+            entity.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 80, 1));
+            entity.addEffect(new MobEffectInstance(MobEffects.GLOWING, 160, 0));
 
             for (int i = 0; i < 12; i++) {
-                double offsetX = serverWorld.random.nextGaussian() * 0.8;
-                double offsetY = serverWorld.random.nextDouble() * 2.0;
-                double offsetZ = serverWorld.random.nextGaussian() * 0.8;
+                double offsetX = serverLevel.getRandom().nextGaussian() * 0.8;
+                double offsetY = serverLevel.getRandom().nextDouble() * 2.0;
+                double offsetZ = serverLevel.getRandom().nextGaussian() * 0.8;
 
-                serverWorld.spawnParticles(ParticleTypes.ELECTRIC_SPARK,
+                serverLevel.sendParticles(ParticleTypes.ELECTRIC_SPARK,
                         entity.getX() + offsetX,
                         entity.getY() + offsetY,
                         entity.getZ() + offsetZ,
                         1, 0, 0, 0, 0.15);
             }
 
-            serverWorld.playSound(null, entity.getX(), entity.getY(), entity.getZ(),
-                    SoundEvents.ENTITY_LIGHTNING_BOLT_IMPACT, SoundCategory.HOSTILE, 0.5F, 2.0F);
+            serverLevel.playSound(null, entity.getX(), entity.getY(), entity.getZ(),
+                    SoundEvents.LIGHTNING_BOLT_IMPACT, SoundSource.HOSTILE, 0.5F, 2.0F);
 
             affectedCount++;
         }
     }
 
-    private void createChainLightningVisual(ServerWorld serverWorld, BlockPos start, BlockPos end) {
-        Vec3d startVec = new Vec3d(start.getX() + 0.5, start.getY() + 1, start.getZ() + 0.5);
-        Vec3d endVec = new Vec3d(end.getX() + 0.5, end.getY() + 1, end.getZ() + 0.5);
+    private void createChainLightningVisual(ServerLevel serverLevel, BlockPos start, BlockPos end) {
+        Vec3 startVec = new Vec3(start.getX() + 0.5, start.getY() + 1, start.getZ() + 0.5);
+        Vec3 endVec = new Vec3(end.getX() + 0.5, end.getY() + 1, end.getZ() + 0.5);
 
         int steps = (int) startVec.distanceTo(endVec) * 2;
         for (int i = 0; i <= steps; i++) {
             double progress = (double) i / steps;
-            Vec3d current = startVec.lerp(endVec, progress);
+            Vec3 current = startVec.lerp(endVec, progress);
 
-            double randomX = serverWorld.random.nextGaussian() * 0.3;
-            double randomY = serverWorld.random.nextGaussian() * 0.2;
-            double randomZ = serverWorld.random.nextGaussian() * 0.3;
+            double randomX = serverLevel.getRandom().nextGaussian() * 0.3;
+            double randomY = serverLevel.getRandom().nextGaussian() * 0.2;
+            double randomZ = serverLevel.getRandom().nextGaussian() * 0.3;
 
-            serverWorld.spawnParticles(ParticleTypes.ELECTRIC_SPARK,
+            serverLevel.sendParticles(ParticleTypes.ELECTRIC_SPARK,
                     current.x + randomX, current.y + randomY, current.z + randomZ,
                     1, 0, 0, 0, 0.1);
         }
     }
 
-    private void createBlockEffects(ServerWorld serverWorld, BlockPos pos) {
+    private void createBlockEffects(ServerLevel serverLevel, BlockPos pos) {
         for (int x = -2; x <= 2; x++) {
             for (int y = -1; y <= 1; y++) {
                 for (int z = -2; z <= 2; z++) {
-                    BlockPos checkPos = pos.add(x, y, z);
-                    if (serverWorld.random.nextFloat() < 0.3F) {
-                        if (serverWorld.getBlockState(checkPos).isOf(Blocks.SAND)) {
-                            serverWorld.setBlockState(checkPos, Blocks.GLASS.getDefaultState());
-                        }
-                        else if (serverWorld.getBlockState(checkPos).isOf(Blocks.DIRT)) {
-                            serverWorld.setBlockState(checkPos, Blocks.COARSE_DIRT.getDefaultState());
-                        }
-                        else if (serverWorld.getBlockState(checkPos).isOf(Blocks.STONE)) {
-                            serverWorld.setBlockState(checkPos, Blocks.CRACKED_STONE_BRICKS.getDefaultState());
+                    BlockPos checkPos = pos.offset(x, y, z);
+                    if (serverLevel.getRandom().nextFloat() < 0.3F) {
+                        if (serverLevel.getBlockState(checkPos).is(Blocks.SAND)) {
+                            serverLevel.setBlock(checkPos, Blocks.GLASS.defaultBlockState(), 3);
+                        } else if (serverLevel.getBlockState(checkPos).is(Blocks.DIRT)) {
+                            serverLevel.setBlock(checkPos, Blocks.COARSE_DIRT.defaultBlockState(), 3);
+                        } else if (serverLevel.getBlockState(checkPos).is(Blocks.STONE)) {
+                            serverLevel.setBlock(checkPos, Blocks.CRACKED_STONE_BRICKS.defaultBlockState(), 3);
                         }
                     }
                 }
             }
         }
 
-        if (serverWorld.random.nextFloat() < 0.5F) {
-            BlockPos belowPos = pos.down();
-            if (serverWorld.getBlockState(belowPos).getBlock().getBlastResistance() < 10.0F) {
-                serverWorld.breakBlock(belowPos, true);
+        if (serverLevel.getRandom().nextFloat() < 0.5F) {
+            BlockPos belowPos = pos.below();
+            if (serverLevel.getBlockState(belowPos).getBlock().getExplosionResistance() < 10.0F) {
+                serverLevel.destroyBlock(belowPos, true, null, 512);
             }
         }
     }
 
-    @Override
-    public UseAction getUseAction(ItemStack stack) {
-        return UseAction.NONE;
-    }
-
-    @Override
-    public boolean isEnchantable(ItemStack stack) {
-        return true;
-    }
-
-    @Override
-    public int getEnchantability() {
-        return 15;
-    }
-
-    private void trackUsage(PlayerEntity player, ServerWorld world) {
-        long currentTime = world.getTime();
+    private void trackUsage(Player player, ServerLevel level) {
+        long currentTime = level.getGameTime();
         useHistory.computeIfAbsent(player, k -> new java.util.ArrayList<>()).add(currentTime);
 
         List<Long> history = useHistory.get(player);
         history.removeIf(time -> currentTime - time > STORM_WINDOW_TICKS);
 
         if (history.size() >= STORM_TRIGGER_USES) {
-            world.setWeather(0, 6000, true, true);
+            level.getServer().setWeatherParameters(0, 6000, true, true);
 
-            HitResult hitResult = player.raycast(50.0, 1.0f, false);
-            BlockPos centerPos;
+            BlockPos centerPos = raycastTargetPos(level, player);
 
-            if (hitResult instanceof BlockHitResult blockHit) {
-                centerPos = blockHit.getBlockPos().up();
-            } else {
-                Vec3d lookVec = player.getRotationVec(1.0f);
-                Vec3d targetVec = player.getEyePos().add(lookVec.multiply(20.0));
-                centerPos = BlockPos.ofFloored(targetVec);
-            }
-
-            summonAdditionalLightning(world, centerPos, 8);
-            player.sendMessage(Text.of("⛈️ You sense a storm brewing in the distance..."), true);
+            summonAdditionalLightning(level, centerPos, 8);
+            player.sendOverlayMessage(Component.literal("A storm brews in the distance..."));
 
             history.clear();
         }

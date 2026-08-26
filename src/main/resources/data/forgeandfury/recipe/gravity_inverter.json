@@ -7,18 +7,10 @@
     "FEF"
   ],
   "key": {
-    "F": {
-      "item": "minecraft:feather"
-    },
-    "E": {
-      "item": "minecraft:ender_pearl"
-    },
-    "A": {
-      "item": "minecraft:amethyst_shard"
-    },
-    "D": {
-      "item": "minecraft:diamond"
-    }
+    "F": "minecraft:feather",
+    "E": "minecraft:ender_pearl",
+    "A": "minecraft:amethyst_shard",
+    "D": "minecraft:diamond"
   },
   "result": {
     "id": "forgeandfury:gravity_inverter",
